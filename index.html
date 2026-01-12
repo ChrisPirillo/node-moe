@@ -1,0 +1,1552 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <!-- SEO & General Metadata -->
+    <title>Node Moe | Dynamic Network Visualizer by Chris Pirillo</title>
+    <meta name="description" content="Node Moe is a high-performance interactive network visualizer and dynamic particle engine. Customize geometry, physics, and post-processing optics in real-time to create stunning generative art.">
+    <meta name="keywords" content="Node Moe, generative art, network visualizer, three.js, webgl, particle system, interactive canvas, Chris Pirillo, dynamic network, creative coding">
+    <meta name="author" content="Chris Pirillo">
+    <link rel="canonical" href="https://pirillo.com/arcade/node-moe.html">
+
+    <!-- Social Media / Open Graph -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://pirillo.com/arcade/node-moe.html">
+    <meta property="og:title" content="Node Moe | Dynamic Network Visualizer">
+    <meta property="og:description" content="Experience Node Moe: An immersive, high-performance interactive particle engine and generative art visualizer.">
+    <meta property="og:image" content="https://pirillo.com/arcade/images/node-moe.png">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:site" content="@ChrisPirillo">
+    <meta name="twitter:creator" content="@ChrisPirillo">
+    <meta name="twitter:title" content="Node Moe | Dynamic Network Visualizer">
+    <meta name="twitter:description" content="Explore a customizable high-performance particle network engine. Adjust optics, physics, and geometry to create unique generative visual art.">
+    <meta name="twitter:image" content="https://pirillo.com/arcade/images/node-moe.png">
+
+    <!-- Resource Hints & Performance -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preload" href="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" as="script" crossorigin>
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Node Moe",
+      "url": "https://pirillo.com/arcade/node-moe.html",
+      "description": "An interactive dynamic network visualizer and generative art tool using Three.js.",
+      "applicationCategory": "MultimediaApplication",
+      "genre": "Generative Art",
+      "browserRequirements": "Requires WebGL support",
+      "author": {
+        "@type": "Person",
+        "name": "Chris Pirillo",
+        "url": "https://pirillo.com"
+      },
+      "image": "https://pirillo.com/arcade/images/node-moe.png"
+    }
+    </script>
+
+    <!-- Google Analytics -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-1CQ4D3VQ3L"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-1CQ4D3VQ3L');
+    </script>
+
+    <style>
+        :root {
+            --primary: #00ccff;
+            --accent: #ff0055;
+            --glass: rgba(5, 5, 5, 0.96);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f0f0f0;
+            --text-muted: #888;
+            --input-bg: rgba(255, 255, 255, 0.05);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050505;
+            /* Core Web Vitals: Font Display Swap to prevent invisible text */
+            font-family: 'Inter', 'Segoe UI', Roboto, sans-serif;
+            font-display: swap; 
+            user-select: none;
+            -webkit-user-select: none;
+            color: var(--text-main);
+        }
+
+        /* --- Canvas & Overlay --- */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #transition-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: #000;
+            z-index: 50;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        /* --- UI Elements --- */
+        .ui-layer {
+            position: absolute;
+            z-index: 100;
+            pointer-events: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Hamburger Button */
+        #menu-btn {
+            position: absolute;
+            top: 25px;
+            right: 25px;
+            width: 44px;
+            height: 44px;
+            background: rgba(0,0,0,0.2);
+            backdrop-filter: blur(4px);
+            border: 1px solid var(--glass-border);
+            border-radius: 50%;
+            cursor: pointer;
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            z-index: 200;
+        }
+
+        #menu-btn:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--primary);
+            transform: scale(1.05);
+        }
+
+        .bar {
+            width: 20px;
+            height: 2px;
+            background-color: var(--text-main);
+            transition: transform 0.3s ease, opacity 0.3s ease, width 0.3s ease;
+            border-radius: 2px;
+        }
+
+        #menu-btn.open .bar:nth-child(1) { transform: translateY(7px) rotate(45deg); width: 24px; }
+        #menu-btn.open .bar:nth-child(2) { opacity: 0; }
+        #menu-btn.open .bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); width: 24px; }
+
+        /* --- Settings Panel --- */
+        #settings-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            height: 100vh;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border-left: 1px solid var(--glass-border);
+            transform: translateX(100%);
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            pointer-events: auto;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -20px 0 50px rgba(0,0,0,0.8);
+            font-size: 0.85rem;
+        }
+
+        #settings-panel.open {
+            transform: translateX(0);
+        }
+
+        .panel-header {
+            padding: 25px;
+            border-bottom: 1px solid var(--glass-border);
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+        }
+
+        .panel-header h2 {
+            margin: 0;
+            font-size: 1.1rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--primary);
+            font-weight: 700;
+        }
+
+        .panel-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 0;
+        }
+
+        /* Accordions */
+        details {
+            border-bottom: 1px solid var(--glass-border);
+            transition: background 0.2s;
+        }
+
+        details:hover { background: rgba(255,255,255,0.02); }
+        details[open] { background: rgba(0,0,0,0.2); padding-bottom: 15px; }
+
+        summary {
+            padding: 18px 25px;
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: var(--text-main);
+            outline: none;
+        }
+        summary::-webkit-details-marker { display: none; }
+        summary:after {
+            content: '+';
+            font-weight: 300;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+            transition: transform 0.3s;
+        }
+        details[open] summary:after { transform: rotate(45deg); }
+
+        /* Controls */
+        .control-grid {
+            padding: 0 25px;
+            display: grid;
+            gap: 16px;
+        }
+
+        .control-item {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .control-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .value-display {
+            color: var(--primary);
+            font-family: monospace;
+        }
+
+        /* Inputs */
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            background: var(--input-bg);
+            border-radius: 2px;
+            outline: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 14px;
+            height: 14px;
+            background: var(--text-main);
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #000;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            transition: transform 0.1s, background 0.2s;
+        }
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.3);
+            background: var(--primary);
+        }
+
+        /* Select Box */
+        select {
+            width: 100%;
+            background: var(--input-bg);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 4px;
+            outline: none;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.85rem;
+        }
+        select option { background: #111; color: #fff; }
+
+        /* Colors */
+        .color-group {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--input-bg);
+            padding: 8px 12px;
+            border-radius: 4px;
+        }
+        input[type="color"] {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 50%;
+            background: none;
+            cursor: pointer;
+        }
+
+        /* Actions */
+        .actions-section {
+            padding: 25px;
+            border-top: 1px solid var(--glass-border);
+            display: grid;
+            gap: 12px;
+            background: var(--glass);
+        }
+        .btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--glass-border);
+            color: var(--text-main);
+            padding: 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: all 0.2s;
+            text-transform: uppercase;
+        }
+        .btn:hover { background: rgba(255,255,255,0.1); border-color: var(--text-muted); }
+        .btn-primary {
+            background: rgba(0, 204, 255, 0.1);
+            border-color: rgba(0, 204, 255, 0.3);
+            color: var(--primary);
+        }
+        .btn-primary:hover {
+            background: var(--primary);
+            color: #000;
+            box-shadow: 0 0 20px rgba(0, 204, 255, 0.4);
+        }
+        .btn-danger {
+            background: rgba(255, 0, 85, 0.15);
+            border-color: rgba(255, 0, 85, 0.3);
+            color: #ff0055;
+        }
+        .btn-danger:hover {
+            background: rgba(255, 0, 85, 0.25);
+            box-shadow: 0 0 15px rgba(255, 0, 85, 0.3);
+        }
+        
+        /* Toggles */
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px 0;
+        }
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 36px;
+            height: 18px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider-switch {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--input-bg);
+            transition: .4s;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+        }
+        .slider-switch:before {
+            position: absolute;
+            content: "";
+            height: 10px;
+            width: 10px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--text-muted);
+            transition: .4s;
+            border-radius: 50%;
+        }
+        input:checked + .slider-switch { background-color: rgba(0,204,255,0.2); border-color: var(--primary); }
+        input:checked + .slider-switch:before { transform: translateX(18px); background-color: var(--primary); }
+
+        /* Hints */
+        .hint {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.3);
+            font-size: 0.75rem;
+            pointer-events: none;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: opacity 1s;
+        }
+        .hint.fade-out { opacity: 0; }
+
+        .loading-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--primary);
+            font-family: monospace;
+            font-size: 1.2rem;
+            letter-spacing: 4px;
+            pointer-events: none;
+            z-index: 200;
+            transition: opacity 0.5s;
+        }
+
+        .panel-content::-webkit-scrollbar { width: 5px; }
+        .panel-content::-webkit-scrollbar-track { background: transparent; }
+        .panel-content::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+    </style>
+    
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+<body>
+
+    <header role="banner">
+        <div id="loading" class="loading-text">INITIALIZING ENGINE...</div>
+    </header>
+
+    <main id="main-content" role="main">
+        <div id="canvas-container"></div>
+        <div id="transition-overlay"></div>
+        
+        <div class="ui-layer">
+            <nav id="menu-btn" aria-label="Toggle Control Deck" role="button" tabindex="0">
+                <div class="bar"></div>
+                <div class="bar"></div>
+                <div class="bar"></div>
+            </nav>
+
+            <section id="settings-panel" aria-labelledby="panel-title">
+                <div class="panel-header">
+                    <h2 id="panel-title">Control Deck</h2>
+                </div>
+                
+                <div class="panel-content">
+                    
+                    <!-- Section: Optics (Post Processing) -->
+                    <details open>
+                        <summary>Optics & Post-FX</summary>
+                        <div class="control-grid">
+                            
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Bloom Strength</span>
+                                    <span class="value-display" id="val-bloom">1.5</span>
+                                </div>
+                                <input type="range" id="inp-bloom" min="0" max="3" step="0.1" aria-label="Bloom Strength">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Bloom Threshold</span>
+                                    <span class="value-display" id="val-threshold">0.1</span>
+                                </div>
+                                <input type="range" id="inp-threshold" min="0" max="1" step="0.05" aria-label="Bloom Threshold">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Bloom Radius</span>
+                                    <span class="value-display" id="val-radius">0.5</span>
+                                </div>
+                                <input type="range" id="inp-radius" min="0" max="1.5" step="0.1" aria-label="Bloom Radius">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>RGB Shift (Glitch)</span>
+                                    <span class="value-display" id="val-rgb">0.00</span>
+                                </div>
+                                <input type="range" id="inp-rgb" min="0" max="0.015" step="0.0005" aria-label="RGB Shift">
+                            </div>
+
+                             <div class="control-item">
+                                <div class="control-header">
+                                    <span>Film Grain</span>
+                                    <span class="value-display" id="val-grain">0.0</span>
+                                </div>
+                                <input type="range" id="inp-grain" min="0" max="1.0" step="0.05" aria-label="Film Grain">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Scanlines</span>
+                                    <span class="value-display" id="val-scan">0.0</span>
+                                </div>
+                                <input type="range" id="inp-scan" min="0" max="1.0" step="0.05" aria-label="Scanlines">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Motion Trails</span>
+                                    <span class="value-display" id="val-trails">0.0</span>
+                                </div>
+                                <input type="range" id="inp-trails" min="0" max="0.95" step="0.05" aria-label="Motion Trails">
+                            </div>
+
+                             <div class="control-item">
+                                <div class="control-header">
+                                    <span>Exposure</span>
+                                    <span class="value-display" id="val-exposure">1.0</span>
+                                </div>
+                                <input type="range" id="inp-exposure" min="0.1" max="2.0" step="0.1" aria-label="Exposure">
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Section: Interaction -->
+                    <details>
+                        <summary>Physics & Motion</summary>
+                        <div class="control-grid">
+                            
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Interaction Mode</span>
+                                </div>
+                                <select id="inp-interaction" aria-label="Interaction Mode">
+                                    <option value="highlight">Highlight Only</option>
+                                    <option value="repel">Repel (Push)</option>
+                                    <option value="attract">Attract (Pull)</option>
+                                </select>
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Mouse Radius</span>
+                                    <span class="value-display" id="val-mradius">100</span>
+                                </div>
+                                <input type="range" id="inp-mradius" min="50" max="300" step="10" aria-label="Mouse Radius">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Chaos (Jitter)</span>
+                                    <span class="value-display" id="val-chaos">0.0</span>
+                                </div>
+                                <input type="range" id="inp-chaos" min="0" max="0.5" step="0.01" aria-label="Chaos Level">
+                            </div>
+
+                             <div class="control-item">
+                                <div class="control-header">
+                                    <span>Wave Amplitude</span>
+                                    <span class="value-display" id="val-wave-amp">0.0</span>
+                                </div>
+                                <input type="range" id="inp-wave-amp" min="0" max="5.0" step="0.1" aria-label="Wave Amplitude">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Wave Frequency</span>
+                                    <span class="value-display" id="val-wave-freq">1.0</span>
+                                </div>
+                                <input type="range" id="inp-wave-freq" min="0.1" max="5.0" step="0.1" aria-label="Wave Frequency">
+                            </div>
+
+                             <div class="control-item">
+                                <div class="control-header">
+                                    <span>Universe Size</span>
+                                    <span class="value-display" id="val-bounds">250</span>
+                                </div>
+                                <input type="range" id="inp-bounds" min="100" max="600" step="10" aria-label="Universe Size">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Drift Speed</span>
+                                    <span class="value-display" id="val-speed">0.2</span>
+                                </div>
+                                <input type="range" id="inp-speed" min="0" max="3" step="0.1" aria-label="Drift Speed">
+                            </div>
+
+                            <div class="control-item" style="margin-top: 10px;">
+                                <button class="btn btn-danger" id="btn-explode" style="width:100%">DETONATE PARTICLES</button>
+                            </div>
+                        </div>
+                    </details>
+
+                    <!-- Section: Geometry -->
+                    <details>
+                        <summary>Geometry & Style</summary>
+                        <div class="control-grid">
+                            
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Node Shape</span>
+                                </div>
+                                <select id="inp-shape" aria-label="Node Shape">
+                                    <option value="sphere">Sphere</option>
+                                    <option value="cube">Cube</option>
+                                    <option value="tetra">Tetrahedron</option>
+                                    <option value="dodeca">Dodecahedron</option>
+                                </select>
+                            </div>
+
+                            <div class="toggle-row">
+                                <span style="font-size: 0.75rem; color:#888; text-transform:uppercase;">Wireframe Mode</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="inp-wireframe">
+                                    <span class="slider-switch"></span>
+                                </label>
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Node Rotation Speed</span>
+                                    <span class="value-display" id="val-node-rot">0.0</span>
+                                </div>
+                                <input type="range" id="inp-node-rot" min="0" max="5.0" step="0.1" aria-label="Node Rotation">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Node Count</span>
+                                    <span class="value-display" id="val-count">200</span>
+                                </div>
+                                <input type="range" id="inp-count" min="50" max="800" step="10" aria-label="Node Count">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Base Size</span>
+                                    <span class="value-display" id="val-size">1.0</span>
+                                </div>
+                                <input type="range" id="inp-size" min="0.1" max="3.0" step="0.1" aria-label="Base Size">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Pulse Speed</span>
+                                    <span class="value-display" id="val-pulse">1.0</span>
+                                </div>
+                                <input type="range" id="inp-pulse" min="0" max="10.0" step="0.5" aria-label="Pulse Speed">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Link Distance</span>
+                                    <span class="value-display" id="val-dist">150</span>
+                                </div>
+                                <input type="range" id="inp-dist" min="50" max="300" step="10" aria-label="Link Distance">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Link Opacity</span>
+                                    <span class="value-display" id="val-opacity">0.15</span>
+                                </div>
+                                <input type="range" id="inp-opacity" min="0" max="1" step="0.05" aria-label="Link Opacity">
+                            </div>
+
+                             <!-- Colors -->
+                             <div class="control-item" style="margin-top:10px;">
+                                <div class="control-header"><span>Color Palette</span></div>
+                                <div class="color-group">
+                                    <label style="font-size: 0.8rem; color: #888;">Base</label>
+                                    <input type="color" id="inp-color-base" aria-label="Base Color">
+                                </div>
+                                
+                                <div class="toggle-row" style="margin-top: 5px;">
+                                    <span style="font-size: 0.8rem; color:#888;">Height Gradient</span>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" id="inp-use-grad">
+                                        <span class="slider-switch"></span>
+                                    </label>
+                                </div>
+                                <div class="color-group" id="grad-color-row" style="opacity: 0.5; pointer-events: none; margin-top: 5px;">
+                                    <label style="font-size: 0.8rem; color: #888;">Gradient Top</label>
+                                    <input type="color" id="inp-color-grad" aria-label="Gradient Top Color">
+                                </div>
+
+                                <div class="control-item" style="margin-top:8px; margin-bottom: 5px;">
+                                    <div class="control-header" style="justify-content: flex-start; gap: 10px;">
+                                        <span>Rainbow Speed</span>
+                                        <span class="value-display" id="val-chroma">0.0</span>
+                                    </div>
+                                    <input type="range" id="inp-chroma" min="0" max="2.0" step="0.1" aria-label="Rainbow Speed">
+                                </div>
+                                <div class="color-group" style="margin-top:5px;">
+                                    <label style="font-size: 0.8rem; color: #888;">Highlight</label>
+                                    <input type="color" id="inp-color-high" aria-label="Highlight Color">
+                                </div>
+                                <div class="color-group" style="margin-top:5px;">
+                                    <label style="font-size: 0.8rem; color: #888;">Background</label>
+                                    <input type="color" id="inp-color-bg" aria-label="Background Color">
+                                </div>
+                            </div>
+
+                        </div>
+                    </details>
+
+                    <!-- Section: Environment & Camera -->
+                    <details>
+                        <summary>Environment & Camera</summary>
+                        <div class="control-grid">
+                            
+                             <div class="toggle-row">
+                                <span style="font-size: 0.75rem; color:#888; text-transform:uppercase;">Background Stars</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="inp-stars">
+                                    <span class="slider-switch"></span>
+                                </label>
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Fog Density</span>
+                                    <span class="value-display" id="val-fog">0.002</span>
+                                </div>
+                                <input type="range" id="inp-fog" min="0" max="0.015" step="0.0005" aria-label="Fog Density">
+                            </div>
+
+                            <div class="toggle-row">
+                                <span style="font-size: 0.8rem; color:#888;">Auto Rotate Camera</span>
+                                <label class="toggle-switch">
+                                    <input type="checkbox" id="inp-rotate">
+                                    <span class="slider-switch"></span>
+                                </label>
+                            </div>
+                            
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Rotation Speed</span>
+                                    <span class="value-display" id="val-rot-speed">0.5</span>
+                                </div>
+                                <input type="range" id="inp-rot-speed" min="0.1" max="5.0" step="0.1" aria-label="Rotation Speed">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Field of View</span>
+                                    <span class="value-display" id="val-fov">60</span>
+                                </div>
+                                <input type="range" id="inp-fov" min="30" max="110" step="5" aria-label="Field of View">
+                            </div>
+
+                            <div class="control-item">
+                                <div class="control-header">
+                                    <span>Auto-Randomize (Sec)</span>
+                                    <span class="value-display" id="val-auto">Off</span>
+                                </div>
+                                <input type="range" id="inp-auto-time" min="0" max="30" step="1" value="0" aria-label="Auto Randomize Timer">
+                            </div>
+                        </div>
+                    </details>
+
+                </div>
+
+                <div class="actions-section">
+                    <button class="btn btn-primary" id="btn-randomize">Randomize All</button>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        <button class="btn" id="btn-reset">Reset</button>
+                        <button class="btn" id="btn-export">Export 4K</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="hint" id="hint-text">Interactive Canvas • Drag to View • Click to Randomize</div>
+    </main>
+
+    <footer role="contentinfo" style="display:none;">
+        <p>© <script>document.write(new Date().getFullYear())</script> Chris Pirillo (@ChrisPirillo). Node Moe Dynamic Network Visualizer.</p>
+    </footer>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+        import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+        import { RGBShiftShader } from 'three/addons/shaders/RGBShiftShader.js';
+        import { FilmPass } from 'three/addons/postprocessing/FilmPass.js';
+        import { AfterimagePass } from 'three/addons/postprocessing/AfterimagePass.js';
+
+        // --- Core State ---
+        const state = {
+            // Physics & Motion
+            particleCount: 200,
+            connectionDistance: 150,
+            particleSpeed: 0.2,
+            particleSize: 1.0,
+            pulseSpeed: 1.0,
+            nodeRotationSpeed: 0.0,
+            nodeShape: 'sphere',
+            wireframe: false,
+            chaos: 0.0,
+            boundarySize: 250,
+            waveAmplitude: 0.0,
+            waveFrequency: 1.0,
+            
+            // Interaction
+            interactionMode: 'highlight', 
+            mouseRadius: 100,
+            
+            // Visuals
+            lineOpacity: 0.15,
+            particleColor: '#00ccff',
+            highlightColor: '#ffffff',
+            bgColor: '#050505',
+            chromaSpeed: 0.0,
+            useGradient: false,
+            gradientColor: '#ff0055',
+            
+            // Environment
+            fogDensity: 0.002,
+            showStars: false,
+            
+            // Post-Processing
+            bloomStrength: 1.2,
+            bloomRadius: 0.5,
+            bloomThreshold: 0.2,
+            exposure: 1.0,
+            rgbShift: 0.00,
+            filmGrain: 0.0,
+            scanlines: 0.0,
+            afterimageStrength: 0.0, // New
+
+            // Camera/System
+            autoRotate: true,
+            rotateSpeed: 0.5,
+            fov: 60,
+            autoAdvanceTime: 0
+        };
+
+        const defaultState = JSON.parse(JSON.stringify(state));
+
+        // --- Globals ---
+        let scene, camera, renderer, composer, controls;
+        let bloomPass, rgbPass, filmPass, afterimagePass;
+        let particles, particlePositions, particleVelocities;
+        let starParticles; 
+        let linesGeometry, linesMesh;
+        let raycaster, mouse;
+        let hoveredInstanceId = -1;
+        let autoAdvanceInterval = null;
+        let isTransitioning = false;
+        
+        // Interaction
+        let isMenuOpen = false;
+        let mouseDownTime = 0;
+        let mouseDownPos = { x: 0, y: 0 };
+        const dummy = new THREE.Object3D();
+        const baseColorObj = new THREE.Color();
+        const gradColorObj = new THREE.Color();
+        const tempColor = new THREE.Color();
+
+        // DOM
+        const container = document.getElementById('canvas-container');
+        const overlay = document.getElementById('transition-overlay');
+        const menuBtn = document.getElementById('menu-btn');
+        const panel = document.getElementById('settings-panel');
+
+        init();
+        
+        function updateUniform(pass, name, value) {
+            if (pass && pass.uniforms) {
+                if (pass.uniforms[name] !== undefined) {
+                    pass.uniforms[name].value = value;
+                    return;
+                }
+                if (name === 'nIntensity' && pass.uniforms['intensity'] !== undefined) {
+                    pass.uniforms['intensity'].value = value;
+                }
+            }
+        }
+
+        function init() {
+            // 1. Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(state.bgColor);
+            scene.fog = new THREE.FogExp2(state.bgColor, state.fogDensity);
+
+            // 2. Camera
+            camera = new THREE.PerspectiveCamera(state.fov, window.innerWidth / window.innerHeight, 1, 1000);
+            camera.position.z = 400;
+
+            // 3. Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance", preserveDrawingBuffer: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.toneMapping = THREE.ReinhardToneMapping;
+            renderer.toneMappingExposure = state.exposure;
+            container.appendChild(renderer.domElement);
+
+            // 4. Controls
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = state.autoRotate;
+            controls.autoRotateSpeed = state.rotateSpeed;
+
+            // 5. Particles (Initial Setup)
+            createParticles();
+            createStars(); 
+
+            // 6. Lines
+            const maxLines = 1000 * 20; 
+            linesGeometry = new THREE.BufferGeometry();
+            const linePositions = new Float32Array(maxLines * 6);
+            linesGeometry.setAttribute('position', new THREE.BufferAttribute(linePositions, 3));
+            linesGeometry.setDrawRange(0, 0);
+
+            const linesMaterial = new THREE.LineBasicMaterial({
+                color: state.particleColor,
+                transparent: true,
+                opacity: state.lineOpacity,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false
+            });
+            linesMesh = new THREE.LineSegments(linesGeometry, linesMaterial);
+            scene.add(linesMesh);
+
+            // 7. Post-Processing Stack
+            const renderScene = new RenderPass(scene, camera);
+            
+            // Bloom
+            bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = state.bloomThreshold;
+            bloomPass.strength = state.bloomStrength;
+            bloomPass.radius = state.bloomRadius;
+
+            // RGB Shift
+            rgbPass = new ShaderPass(RGBShiftShader);
+            rgbPass.uniforms['amount'].value = state.rgbShift;
+            
+            // Film Grain & Scanlines
+            filmPass = new FilmPass(state.filmGrain, state.scanlines, 800, 0);
+            updateUniform(filmPass, 'nIntensity', state.filmGrain);
+            updateUniform(filmPass, 'sIntensity', state.scanlines);
+            updateUniform(filmPass, 'sCount', 800);
+            updateUniform(filmPass, 'grayscale', 0);
+
+            // Afterimage (Trails)
+            afterimagePass = new AfterimagePass();
+            afterimagePass.uniforms['damp'].value = state.afterimageStrength;
+
+            const outputPass = new OutputPass();
+
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(afterimagePass); 
+            composer.addPass(bloomPass);
+            composer.addPass(filmPass);
+            composer.addPass(rgbPass);
+            composer.addPass(outputPass);
+
+            // 8. Raycaster
+            raycaster = new THREE.Raycaster();
+            raycaster.params.Points.threshold = 5;
+            mouse = new THREE.Vector2(10000, 10000);
+
+            // 9. Listeners
+            window.addEventListener('resize', onWindowResize);
+            document.addEventListener('mousemove', onMouseMove);
+            
+            renderer.domElement.addEventListener('mousedown', (e) => {
+                mouseDownTime = Date.now();
+                mouseDownPos = { x: e.clientX, y: e.clientY };
+            });
+
+            renderer.domElement.addEventListener('mouseup', (e) => {
+                const timeDiff = Date.now() - mouseDownTime;
+                const distDiff = Math.sqrt(Math.pow(e.clientX - mouseDownPos.x, 2) + Math.pow(e.clientY - mouseDownPos.y, 2));
+                if (timeDiff < 200 && distDiff < 5 && !isMenuOpen) {
+                    triggerRandomize();
+                }
+            });
+
+            // Start
+            animate();
+            
+            // Initial Randomize
+            triggerRandomize(true);
+
+            // UI Init
+            initUI();
+
+            setTimeout(() => {
+                document.getElementById('loading').style.opacity = 0;
+            }, 600);
+        }
+
+        function getGeometry() {
+            switch(state.nodeShape) {
+                case 'cube': return new THREE.BoxGeometry(3,3,3);
+                case 'tetra': return new THREE.TetrahedronGeometry(3);
+                case 'dodeca': return new THREE.DodecahedronGeometry(2);
+                case 'sphere': default: return new THREE.SphereGeometry(2, 12, 12);
+            }
+        }
+
+        function createStars() {
+            if(starParticles) scene.remove(starParticles);
+            
+            const count = 1500;
+            const geo = new THREE.BufferGeometry();
+            const pos = new Float32Array(count * 3);
+            
+            for(let i=0; i<count; i++) {
+                pos[i*3] = (Math.random() - 0.5) * 1500;
+                pos[i*3+1] = (Math.random() - 0.5) * 1500;
+                pos[i*3+2] = (Math.random() - 0.5) * 1500;
+            }
+            
+            geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const mat = new THREE.PointsMaterial({color: 0x888888, size: 1.5, sizeAttenuation: true, transparent: true, opacity: 0.6});
+            starParticles = new THREE.Points(geo, mat);
+            starParticles.visible = state.showStars;
+            scene.add(starParticles);
+        }
+
+        function createParticles() {
+            if (particles) {
+                scene.remove(particles);
+                particles.geometry.dispose();
+                if(particles.material) particles.material.dispose();
+            }
+
+            const geometry = getGeometry();
+            const material = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff,
+                wireframe: state.wireframe
+            });
+            particles = new THREE.InstancedMesh(geometry, material, 1000);
+            particles.count = state.particleCount;
+            scene.add(particles);
+
+            if (!particlePositions) {
+                particlePositions = new Float32Array(1000 * 3);
+                particleVelocities = new Float32Array(1000 * 3);
+                for (let i = 0; i < 1000; i++) resetParticle(i);
+            }
+
+            baseColorObj.set(state.particleColor);
+            for (let i = 0; i < 1000; i++) {
+                particles.setColorAt(i, baseColorObj);
+            }
+            particles.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            particles.instanceColor.setUsage(THREE.DynamicDrawUsage);
+        }
+
+        function resetParticle(i) {
+            const range = state.boundarySize * 1.5; 
+            particlePositions[i * 3] = (Math.random() - 0.5) * range;
+            particlePositions[i * 3 + 1] = (Math.random() - 0.5) * range;
+            particlePositions[i * 3 + 2] = (Math.random() - 0.5) * range;
+
+            const spd = Math.max(0.05, state.particleSpeed);
+            particleVelocities[i * 3] = (Math.random() - 0.5) * spd;
+            particleVelocities[i * 3 + 1] = (Math.random() - 0.5) * spd;
+            particleVelocities[i * 3 + 2] = (Math.random() - 0.5) * spd;
+        }
+
+        function triggerExplosion() {
+            const count = state.particleCount;
+            for(let i=0; i<count; i++) {
+                const x = particlePositions[i*3];
+                const y = particlePositions[i*3+1];
+                const z = particlePositions[i*3+2];
+                const len = Math.sqrt(x*x + y*y + z*z) + 0.1;
+                particleVelocities[i*3] += (x/len) * 5.0;
+                particleVelocities[i*3+1] += (y/len) * 5.0;
+                particleVelocities[i*3+2] += (z/len) * 5.0;
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const count = state.particleCount;
+            const limit = state.boundarySize;
+            const spd = state.particleSpeed;
+            const chaos = state.chaos;
+            const time = Date.now() * 0.001;
+            
+            if(state.chromaSpeed > 0) {
+                baseColorObj.set(state.particleColor);
+                const hsl = {};
+                baseColorObj.getHSL(hsl);
+                hsl.h = (hsl.h + (time * 0.1 * state.chromaSpeed)) % 1.0;
+                baseColorObj.setHSL(hsl.h, hsl.s, hsl.l);
+                linesMesh.material.color = baseColorObj;
+            } else {
+                baseColorObj.set(state.particleColor);
+                if(!state.useGradient) linesMesh.material.color = baseColorObj;
+            }
+
+            if(state.useGradient) {
+                gradColorObj.set(state.gradientColor);
+                linesMesh.material.color = baseColorObj; 
+            }
+
+            if(state.useGradient) {
+                for(let i=0; i<count; i++) {
+                    const y = particlePositions[i*3+1];
+                    let alpha = (y + limit) / (limit * 2);
+                    alpha = Math.max(0, Math.min(1, alpha));
+                    
+                    if(i === hoveredInstanceId) {
+                        tempColor.set(state.highlightColor);
+                    } else {
+                        tempColor.copy(baseColorObj).lerp(gradColorObj, alpha);
+                    }
+                    particles.setColorAt(i, tempColor);
+                }
+                particles.instanceColor.needsUpdate = true;
+            } else if(state.chromaSpeed > 0 && hoveredInstanceId === -1) {
+                for(let i=0; i<count; i++) particles.setColorAt(i, baseColorObj);
+                particles.instanceColor.needsUpdate = true;
+            }
+
+            raycaster.setFromCamera(mouse, camera);
+            const ray = raycaster.ray;
+
+            const pulseFactor = state.pulseSpeed > 0 ? (Math.sin(time * state.pulseSpeed) * 0.2 + 1.0) : 1.0;
+            const waveAmp = state.waveAmplitude;
+            const waveFreq = state.waveFrequency;
+
+            for (let i = 0; i < count; i++) {
+                let x = particlePositions[i * 3];
+                let y = particlePositions[i * 3 + 1];
+                let z = particlePositions[i * 3 + 2];
+
+                let vx = particleVelocities[i * 3];
+                let vy = particleVelocities[i * 3 + 1];
+                let vz = particleVelocities[i * 3 + 2];
+
+                if (chaos > 0) {
+                    vx += (Math.random() - 0.5) * chaos * 0.1;
+                    vy += (Math.random() - 0.5) * chaos * 0.1;
+                    vz += (Math.random() - 0.5) * chaos * 0.1;
+                }
+                
+                if (state.interactionMode !== 'highlight') {
+                    const vec = new THREE.Vector3(x, y, z);
+                    const distSq = ray.distanceSqToPoint(vec);
+                    const rangeSq = state.mouseRadius * state.mouseRadius;
+                    
+                    if (distSq < rangeSq) { 
+                         const closestPoint = new THREE.Vector3();
+                         ray.closestPointToPoint(vec, closestPoint);
+                         const dx = x - closestPoint.x;
+                         const dy = y - closestPoint.y;
+                         const dz = z - closestPoint.z;
+                         const len = Math.sqrt(dx*dx + dy*dy + dz*dz) + 0.1;
+                         const force = (1.0 - (len / state.mouseRadius)) * 2.5;
+                         
+                         if (force > 0) {
+                            if (state.interactionMode === 'repel') {
+                                vx += (dx / len) * force; vy += (dy / len) * force; vz += (dz / len) * force;
+                            } else if (state.interactionMode === 'attract') {
+                                vx -= (dx / len) * force; vy -= (dy / len) * force; vz -= (dz / len) * force;
+                            }
+                         }
+                    }
+                }
+
+                if (x < -limit || x > limit) vx = -vx;
+                if (y < -limit || y > limit) vy = -vy;
+                if (z < -limit || z > limit) vz = -vz;
+
+                const currentSpeedSq = vx*vx + vy*vy + vz*vz;
+                if (currentSpeedSq > 0) {
+                     const targetSpeed = spd;
+                     const speedFactor = targetSpeed / (Math.sqrt(currentSpeedSq) || 1);
+                     const lerp = 0.05; 
+                     vx = vx * (1 - lerp) + (vx * speedFactor) * lerp;
+                     vy = vy * (1 - lerp) + (vy * speedFactor) * lerp;
+                     vz = vz * (1 - lerp) + (vz * speedFactor) * lerp;
+                }
+
+                x += vx; y += vy; z += vz;
+                
+                let renderX = x;
+                let renderY = y;
+                let renderZ = z;
+
+                if (waveAmp > 0) {
+                    renderY += Math.sin((x * 0.01 * waveFreq) + time) * waveAmp * 10;
+                    renderZ += Math.cos((y * 0.01 * waveFreq) + time) * waveAmp * 10;
+                }
+
+                particlePositions[i * 3] = x;
+                particlePositions[i * 3 + 1] = y;
+                particlePositions[i * 3 + 2] = z;
+                
+                particleVelocities[i * 3] = vx;
+                particleVelocities[i * 3 + 1] = vy;
+                particleVelocities[i * 3 + 2] = vz;
+
+                dummy.position.set(renderX, renderY, renderZ);
+                
+                if(state.nodeRotationSpeed > 0) {
+                    dummy.rotation.x += state.nodeRotationSpeed * 0.02 * (i%2===0?1:-1);
+                    dummy.rotation.y += state.nodeRotationSpeed * 0.03 * (i%3===0?1:-1);
+                } else {
+                    dummy.rotation.set(0,0,0);
+                }
+
+                let s = state.particleSize * pulseFactor;
+                if (i === hoveredInstanceId) s *= 2.5;
+                dummy.scale.set(s, s, s);
+
+                dummy.updateMatrix();
+                particles.setMatrixAt(i, dummy.matrix);
+            }
+            particles.instanceMatrix.needsUpdate = true;
+
+            updateLines();
+            checkIntersection();
+
+            controls.update();
+            composer.render();
+        }
+
+        function updateLines() {
+            const positions = linesGeometry.attributes.position.array;
+            const count = state.particleCount;
+            const connectDistSq = state.connectionDistance * state.connectionDistance;
+            let vertexIndex = 0;
+            let linesDrawn = 0;
+            
+            for (let i = 0; i < count; i++) {
+                for (let j = i + 1; j < count; j++) {
+                    const dx = particlePositions[i * 3] - particlePositions[j * 3];
+                    const dy = particlePositions[i * 3 + 1] - particlePositions[j * 3 + 1];
+                    const dz = particlePositions[i * 3 + 2] - particlePositions[j * 3 + 2];
+                    
+                    if (dx*dx + dy*dy + dz*dz < connectDistSq) {
+                        positions[vertexIndex++] = particlePositions[i * 3];
+                        positions[vertexIndex++] = particlePositions[i * 3 + 1];
+                        positions[vertexIndex++] = particlePositions[i * 3 + 2];
+
+                        positions[vertexIndex++] = particlePositions[j * 3];
+                        positions[vertexIndex++] = particlePositions[j * 3 + 1];
+                        positions[vertexIndex++] = particlePositions[j * 3 + 2];
+                        linesDrawn++;
+                    }
+                }
+            }
+            linesGeometry.setDrawRange(0, linesDrawn * 2);
+            linesGeometry.attributes.position.needsUpdate = true;
+        }
+
+        function checkIntersection() {
+            const intersections = raycaster.intersectObject(particles);
+            const highC = new THREE.Color(state.highlightColor);
+
+            if (intersections.length > 0) {
+                const id = intersections[0].instanceId;
+                if (id !== hoveredInstanceId) {
+                    hoveredInstanceId = id;
+                }
+                document.body.style.cursor = 'crosshair';
+                particles.setColorAt(id, highC);
+                particles.instanceColor.needsUpdate = true;
+            } else {
+                hoveredInstanceId = -1;
+                document.body.style.cursor = 'default';
+            }
+        }
+
+        function triggerRandomize(skipTransition = false) {
+            if (isTransitioning) return;
+            isTransitioning = true;
+            if(!skipTransition) overlay.style.opacity = 1;
+
+            setTimeout(() => {
+                state.particleCount = Math.floor(Math.random() * 400) + 150;
+                state.connectionDistance = Math.floor(Math.random() * 120) + 80;
+                state.particleSpeed = Math.random() * 0.8 + 0.1;
+                state.particleSize = Math.random() * 1.5 + 0.5;
+                state.pulseSpeed = Math.random() * 4.0;
+                state.boundarySize = Math.floor(Math.random() * 200) + 200;
+                state.chaos = Math.random() < 0.3 ? Math.random() * 0.3 : 0;
+                state.chromaSpeed = Math.random() < 0.3 ? Math.random() * 1.5 : 0;
+                state.nodeRotationSpeed = Math.random() * 2.0;
+                state.waveAmplitude = Math.random() < 0.3 ? Math.random() * 2.0 : 0;
+                state.waveFrequency = Math.random() * 3.0;
+
+                const shapes = ['sphere', 'cube', 'tetra', 'dodeca'];
+                state.nodeShape = shapes[Math.floor(Math.random() * shapes.length)];
+                state.wireframe = Math.random() < 0.2; 
+
+                const h = Math.random();
+                const s = 0.7 + Math.random() * 0.3;
+                const l = 0.4 + Math.random() * 0.2;
+                const newColor = new THREE.Color().setHSL(h, s, l);
+                state.particleColor = '#' + newColor.getHexString();
+                
+                state.useGradient = Math.random() < 0.4;
+                const h2 = (h + 0.5) % 1.0; 
+                const gradC = new THREE.Color().setHSL(h2, s, l);
+                state.gradientColor = '#' + gradC.getHexString();
+
+                state.bloomStrength = Math.random() * 1.5 + 0.2;
+                state.bloomRadius = Math.random() * 0.8 + 0.1;
+                state.bloomThreshold = Math.random() * 0.2 + 0.05;
+                state.exposure = Math.random() * 0.6 + 0.8;
+                state.rgbShift = Math.random() < 0.5 ? 0 : Math.random() * 0.005; 
+                state.filmGrain = Math.random() < 0.4 ? Math.random() * 0.5 : 0;
+                state.scanlines = Math.random() < 0.3 ? Math.random() * 0.5 : 0;
+                state.afterimageStrength = Math.random() < 0.3 ? 0.7 + Math.random()*0.2 : 0;
+                state.fogDensity = Math.random() * 0.005;
+                state.showStars = Math.random() < 0.4;
+                
+                state.fov = Math.floor(Math.random() * 60) + 40; 
+
+                applyConfig();
+                updateUI();
+
+                setTimeout(() => {
+                    overlay.style.opacity = 0;
+                    isTransitioning = false;
+                }, 400);
+            }, skipTransition ? 0 : 600);
+        }
+
+        function applyConfig() {
+            createParticles();
+            starParticles.visible = state.showStars;
+            scene.fog.density = state.fogDensity;
+
+            const c = new THREE.Color(state.particleColor);
+            linesMesh.material.color = c;
+            linesMesh.material.opacity = state.lineOpacity;
+            linesMesh.material.needsUpdate = true;
+
+            scene.background = new THREE.Color(state.bgColor);
+            scene.fog.color = new THREE.Color(state.bgColor);
+
+            bloomPass.strength = state.bloomStrength;
+            bloomPass.radius = state.bloomRadius;
+            bloomPass.threshold = state.bloomThreshold;
+            
+            updateUniform(rgbPass, 'amount', state.rgbShift);
+            updateUniform(filmPass, 'nIntensity', state.filmGrain);
+            updateUniform(filmPass, 'sIntensity', state.scanlines);
+            
+            if(afterimagePass) afterimagePass.uniforms['damp'].value = state.afterimageStrength;
+
+            renderer.toneMappingExposure = state.exposure;
+
+            camera.fov = state.fov;
+            camera.updateProjectionMatrix();
+            controls.autoRotate = state.autoRotate;
+            controls.autoRotateSpeed = state.rotateSpeed;
+        }
+
+        function initUI() {
+            const bind = (id, key, type='float') => {
+                const el = document.getElementById(id);
+                if(!el) { return; }
+                const disp = document.getElementById(id.replace('inp', 'val'));
+                
+                if(type === 'check') el.checked = state[key];
+                else el.value = state[key];
+
+                el.addEventListener('input', (e) => {
+                    let val = e.target.value;
+                    if(type === 'float') val = parseFloat(val);
+                    if(type === 'int') val = parseInt(val);
+                    if(type === 'check') val = e.target.checked;
+                    
+                    state[key] = val;
+                    if(disp) disp.innerText = val;
+                    applyConfig();
+                    if(key === 'autoAdvanceTime') handleAutoAdvance(val);
+                    
+                    if(id === 'inp-use-grad') {
+                        document.getElementById('grad-color-row').style.opacity = val ? 1 : 0.5;
+                        document.getElementById('grad-color-row').style.pointerEvents = val ? 'auto' : 'none';
+                    }
+                });
+            };
+
+            bind('inp-bloom', 'bloomStrength');
+            bind('inp-threshold', 'bloomThreshold');
+            bind('inp-radius', 'bloomRadius');
+            bind('inp-rgb', 'rgbShift');
+            bind('inp-exposure', 'exposure');
+            bind('inp-grain', 'filmGrain');
+            bind('inp-scan', 'scanlines');
+            bind('inp-trails', 'afterimageStrength');
+            
+            bind('inp-chaos', 'chaos');
+            bind('inp-bounds', 'boundarySize', 'int');
+            bind('inp-interaction', 'interactionMode', 'str');
+            bind('inp-mradius', 'mouseRadius', 'int');
+            bind('inp-wave-amp', 'waveAmplitude');
+            bind('inp-wave-freq', 'waveFrequency');
+
+            bind('inp-color-base', 'particleColor', 'color');
+            bind('inp-color-high', 'highlightColor', 'color');
+            bind('inp-color-bg', 'bgColor', 'color');
+            bind('inp-chroma', 'chromaSpeed');
+            bind('inp-use-grad', 'useGradient', 'check');
+            bind('inp-color-grad', 'gradientColor', 'color');
+
+            bind('inp-shape', 'nodeShape', 'str'); 
+            bind('inp-wireframe', 'wireframe', 'check');
+            bind('inp-count', 'particleCount', 'int');
+            bind('inp-size', 'particleSize');
+            bind('inp-pulse', 'pulseSpeed');
+            bind('inp-dist', 'connectionDistance', 'int');
+            bind('inp-opacity', 'lineOpacity');
+            bind('inp-speed', 'particleSpeed');
+            bind('inp-node-rot', 'nodeRotationSpeed');
+
+            bind('inp-rotate', 'autoRotate', 'check');
+            bind('inp-rot-speed', 'rotateSpeed');
+            bind('inp-fov', 'fov', 'int');
+            bind('inp-auto-time', 'autoAdvanceTime', 'int');
+            bind('inp-fog', 'fogDensity');
+            bind('inp-stars', 'showStars', 'check');
+
+            document.getElementById('inp-shape').addEventListener('change', (e) => {
+                state.nodeShape = e.target.value;
+                applyConfig();
+            });
+            document.getElementById('inp-interaction').addEventListener('change', (e) => {
+                state.interactionMode = e.target.value;
+            });
+            document.getElementById('btn-explode').addEventListener('click', triggerExplosion);
+
+            document.getElementById('btn-randomize').onclick = () => triggerRandomize();
+            document.getElementById('btn-reset').onclick = () => {
+                Object.assign(state, defaultState);
+                applyConfig();
+                updateUI();
+            };
+            document.getElementById('btn-export').onclick = exportWallpaper;
+            
+            menuBtn.onclick = (e) => {
+                e.stopPropagation();
+                isMenuOpen = !isMenuOpen;
+                isMenuOpen ? (menuBtn.classList.add('open'), panel.classList.add('open')) : (menuBtn.classList.remove('open'), panel.classList.remove('open'));
+            };
+
+            document.addEventListener('click', (e) => {
+                if(isMenuOpen && !panel.contains(e.target) && !menuBtn.contains(e.target)) {
+                    isMenuOpen = false;
+                    menuBtn.classList.remove('open');
+                    panel.classList.remove('open');
+                }
+            });
+            
+            document.body.onclick = () => document.getElementById('hint-text').classList.add('fade-out');
+        }
+
+        function updateUI() {
+            const map = {
+                'inp-bloom': 'bloomStrength', 'inp-threshold': 'bloomThreshold', 'inp-radius': 'bloomRadius',
+                'inp-rgb': 'rgbShift', 'inp-exposure': 'exposure', 'inp-grain': 'filmGrain', 'inp-scan': 'scanlines', 'inp-trails': 'afterimageStrength',
+                'inp-chaos': 'chaos', 'inp-bounds': 'boundarySize', 'inp-mradius': 'mouseRadius', 'inp-wave-amp': 'waveAmplitude', 'inp-wave-freq': 'waveFrequency',
+                'inp-count': 'particleCount', 'inp-size': 'particleSize', 'inp-pulse': 'pulseSpeed',
+                'inp-dist': 'connectionDistance', 'inp-opacity': 'lineOpacity', 'inp-speed': 'particleSpeed', 'inp-node-rot': 'nodeRotationSpeed',
+                'inp-rot-speed': 'rotateSpeed', 'inp-fov': 'fov', 'inp-auto-time': 'autoAdvanceTime', 'inp-fog': 'fogDensity',
+                'inp-color-base': 'particleColor', 'inp-color-high': 'highlightColor', 'inp-color-bg': 'bgColor', 'inp-chroma': 'chromaSpeed', 'inp-color-grad': 'gradientColor'
+            };
+
+            for(const [id, key] of Object.entries(map)) {
+                const el = document.getElementById(id);
+                if(el) {
+                    el.value = state[key];
+                    const disp = document.getElementById(id.replace('inp', 'val'));
+                    if(disp) disp.innerText = (typeof state[key] === 'number' && !Number.isInteger(state[key])) ? state[key].toFixed(3) : state[key];
+                }
+            }
+            
+            document.getElementById('inp-rotate').checked = state.autoRotate;
+            document.getElementById('inp-wireframe').checked = state.wireframe;
+            document.getElementById('inp-stars').checked = state.showStars;
+            document.getElementById('inp-use-grad').checked = state.useGradient;
+            document.getElementById('inp-shape').value = state.nodeShape;
+            document.getElementById('inp-interaction').value = state.interactionMode;
+            
+            document.getElementById('grad-color-row').style.opacity = state.useGradient ? 1 : 0.5;
+            document.getElementById('grad-color-row').style.pointerEvents = state.useGradient ? 'auto' : 'none';
+            
+            const autoVal = state.autoAdvanceTime;
+            document.getElementById('val-auto').innerText = autoVal === 0 ? "Off" : autoVal;
+            handleAutoAdvance(autoVal);
+        }
+
+        function handleAutoAdvance(val) {
+            if (autoAdvanceInterval) clearInterval(autoAdvanceInterval);
+            document.getElementById('val-auto').innerText = val === 0 ? "Off" : val;
+            if (val > 0) {
+                autoAdvanceInterval = setInterval(() => { if (!isMenuOpen) triggerRandomize(); }, val * 1000);
+            }
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function onMouseMove(event) {
+            event.preventDefault();
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        }
+
+        function exportWallpaper() {
+            const width = 3840;
+            const height = 2160;
+            renderer.setSize(width, height);
+            composer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            composer.render();
+            const link = document.createElement('a');
+            link.download = `network-art-${Date.now()}.png`;
+            link.href = renderer.domElement.toDataURL('image/png');
+            link.click();
+            onWindowResize();
+        }
+    </script>
+</body>
+</html>
